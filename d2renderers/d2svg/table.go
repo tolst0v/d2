@@ -75,7 +75,7 @@ func tableHeader(diagramHash string, shape d2target.Shape, box *geo.Box, text st
 	return str
 }
 
-func tableRow(shape d2target.Shape, box *geo.Box, nameText, typeText, constraintText string, fontSize, longestNameWidth, longestTypeWidth float64, inlineTheme *d2themes.Theme) string {
+func tableRow(shape d2target.Shape, box *geo.Box, nameText, typeText, constraintText, comment string, fontSize, longestNameWidth, longestTypeWidth float64, inlineTheme *d2themes.Theme) string {
 	// Row is made up of name, type, and constraint
 	// e.g. | diagram   int   FK |
 	nameTL := label.InsideMiddleLeft.GetPointOnBox(
@@ -91,11 +91,15 @@ func tableRow(shape d2target.Shape, box *geo.Box, nameText, typeText, constraint
 	textEl.Fill = shape.PrimaryAccentColor
 	textEl.ClassName = "text"
 	textEl.Style = fmt.Sprintf("text-anchor:%s;font-size:%vpx", "start", fontSize)
+	if comment != "" {
+		textEl.Attributes = fmt.Sprintf(`data-d2-comment="%s"`, html.EscapeString(comment))
+	}
 	textEl.Content = svg.EscapeText(nameText)
 	out := textEl.Render()
 
 	textEl.X += longestNameWidth + d2target.TypePadding
 	textEl.Fill = shape.NeutralAccentColor
+	textEl.Attributes = ""
 	textEl.Content = svg.EscapeText(typeText)
 	out += textEl.Render()
 
@@ -148,7 +152,7 @@ func drawTable(writer io.Writer, diagramHash string, targetShape d2target.Shape,
 	rowBox.TopLeft.Y += headerBox.Height
 	for idx, f := range targetShape.Columns {
 		fmt.Fprint(writer,
-			tableRow(targetShape, rowBox, f.Name.Label, f.Type.Label, f.ConstraintAbbr(), float64(targetShape.FontSize), float64(longestNameWidth), float64(longestTypeWidth), inlineTheme),
+			tableRow(targetShape, rowBox, f.Name.Label, f.Type.Label, f.ConstraintAbbr(), f.Comment, float64(targetShape.FontSize), float64(longestNameWidth), float64(longestTypeWidth), inlineTheme),
 		)
 		rowBox.TopLeft.Y += rowHeight
 

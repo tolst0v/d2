@@ -1,6 +1,8 @@
 package d2svg
 
 import (
+	"bytes"
+	"strings"
 	"testing"
 
 	"oss.terrastruct.com/d2/d2target"
@@ -79,5 +81,43 @@ func TestSortObjects(t *testing.T) {
 		if allObjects[i].GetID() != expectedOrder[i].GetID() {
 			t.Fatalf("object order differs at index %d, got '%s' expected '%s'", i, allObjects[i].GetID(), expectedOrder[i].GetID())
 		}
+	}
+}
+
+func TestDrawTableCommentAttribute(t *testing.T) {
+	var buf bytes.Buffer
+
+	drawTable(&buf, "hash", d2target.Shape{
+		Type:       d2target.ShapeSQLTable,
+		Fill:       "#fff",
+		Stroke:     "#000",
+		PrimaryAccentColor:   "#111",
+		NeutralAccentColor:   "#222",
+		SecondaryAccentColor: "#333",
+		Text: d2target.Text{
+			FontSize:    16,
+			Label:       "users",
+			LabelWidth:  40,
+			LabelHeight: 16,
+		},
+		Pos: d2target.Point{
+			X: 0,
+			Y: 0,
+		},
+		Width:  300,
+		Height: 80,
+		SQLTable: d2target.SQLTable{
+			Columns: []d2target.SQLColumn{
+				{
+					Name:    d2target.Text{Label: "id"},
+					Type:    d2target.Text{Label: "bigint"},
+					Comment: `Primary "identifier"`,
+				},
+			},
+		},
+	}, nil)
+
+	if !strings.Contains(buf.String(), `data-d2-comment="Primary &#34;identifier&#34;"`) {
+		t.Fatalf("expected sql_table column comment attribute in svg, got: %s", buf.String())
 	}
 }

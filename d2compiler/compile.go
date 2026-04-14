@@ -334,7 +334,7 @@ func (c *compiler) compileMap(obj *d2graph.Object, m *d2ir.Map) {
 		case d2target.ShapeClass:
 			c.compileClass(obj)
 		case d2target.ShapeSQLTable:
-			c.compileSQLTable(obj)
+			c.compileSQLTable(obj, m)
 		}
 
 		for _, e := range m.Edges {
@@ -405,6 +405,12 @@ func (c *compiler) compileField(obj *d2graph.Object, f *d2ir.Field) {
 	obj = obj.EnsureChild(([]d2ast.String{f.Name}))
 	if f.Primary() != nil {
 		c.compileLabel(&obj.Attributes, f)
+	}
+	for _, fr := range f.References {
+		if fr.Primary() && fr.Context_.Key.Value.Map != nil {
+			obj.Map = fr.Context_.Key.Value.Map
+			break
+		}
 	}
 	if f.Map() != nil {
 		c.compileMap(obj, f.Map())
@@ -1057,7 +1063,7 @@ func (c *compiler) compileClass(obj *d2graph.Object) {
 	obj.ChildrenArray = nil
 }
 
-func (c *compiler) compileSQLTable(obj *d2graph.Object) {
+func (c *compiler) compileSQLTable(obj *d2graph.Object, m *d2ir.Map) {
 	obj.SQLTable = &d2target.SQLTable{}
 	for _, col := range obj.ChildrenArray {
 		typ := col.Label.Value
@@ -1070,6 +1076,7 @@ func (c *compiler) compileSQLTable(obj *d2graph.Object) {
 			Name:       d2target.Text{Label: col.IDVal},
 			Type:       d2target.Text{Label: typ},
 			Constraint: col.Constraint,
+			Comment:    mapKeyComment(obj.Map, col.IDVal),
 		}
 		obj.SQLTable.Columns = append(obj.SQLTable.Columns, d2Col)
 	}
@@ -1084,6 +1091,54 @@ func (c *compiler) compileSQLTable(obj *d2graph.Object) {
 	}
 	obj.Children = nil
 	obj.ChildrenArray = nil
+}
+
+func mapKeyComment(scope *d2ast.Map, keyName string) string {
+	if scope == nil {
+		return ""
+	}
+	nodes := scope.Nodes
+	for i, node := range nodes {
+		if node.MapKey == nil || node.MapKey.Key == nil || len(node.MapKey.Key.Path) == 0 {
+			continue
+		}
+		if node.MapKey.Key.Path[0].Unbox().ScalarString() != keyName {
+			continue
+		}
+
+		var parts []string
+
+		nextStartLine := node.MapKey.Range.Start.Line
+		for j := i - 1; j >= 0; j-- {
+			comment, startLine, endLine, ok := commentNodeValue(nodes[j])
+			if !ok || nextStartLine-endLine > 1 {
+				break
+			}
+			parts = append([]string{comment}, parts...)
+			nextStartLine = startLine
+		}
+
+		if i+1 < len(nodes) {
+			comment, _, startLine, ok := commentNodeValue(nodes[i+1])
+			if ok && startLine == node.MapKey.Range.End.Line {
+				parts = append(parts, comment)
+			}
+		}
+
+		return strings.TrimSpace(strings.Join(parts, "\n"))
+	}
+	return ""
+}
+
+func commentNodeValue(node d2ast.MapNodeBox) (value string, startLine, endLine int, ok bool) {
+	switch {
+	case node.Comment != nil:
+		return strings.TrimSpace(node.Comment.Value), node.Comment.Range.Start.Line, node.Comment.Range.End.Line, true
+	case node.BlockComment != nil:
+		return strings.TrimSpace(node.BlockComment.Value), node.BlockComment.Range.Start.Line, node.BlockComment.Range.End.Line, true
+	default:
+		return "", 0, 0, false
+	}
 }
 
 func (c *compiler) validateKeys(obj *d2graph.Object, m *d2ir.Map) {

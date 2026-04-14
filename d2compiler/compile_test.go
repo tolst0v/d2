@@ -6353,3 +6353,21 @@ func assertCompile(t *testing.T, text string, expErr string) (*d2graph.Graph, *d
 	assert.Success(t, err)
 	return g, config
 }
+
+func TestSQLTableColumnComments(t *testing.T) {
+	t.Parallel()
+
+	g, _, err := d2compiler.Compile("sql_table_column_comments.d2", strings.NewReader(`users: {
+  shape: sql_table
+
+  # Уникальный идентификатор пользователя
+  id: bigint
+  email: text # Электронная почта
+}`), nil)
+	assert.Success(t, err)
+
+	table := g.Objects[0].SQLTable
+	assert.Equal(t, 2, len(table.Columns))
+	assert.String(t, "Уникальный идентификатор пользователя", table.Columns[0].Comment)
+	assert.String(t, "Электронная почта", table.Columns[1].Comment)
+}

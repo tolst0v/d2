@@ -21,6 +21,7 @@ type SQLColumn struct {
 	Name       Text     `json:"name"`
 	Type       Text     `json:"type"`
 	Constraint []string `json:"constraint"`
+	Comment    string   `json:"comment,omitempty"`
 	Reference  string   `json:"reference"`
 }
 
